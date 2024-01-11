@@ -52,8 +52,9 @@ services:
 
 Create the file `.env` at the server root folder with the following content:
 
+__.env__
 ```shell
-NEO4J_PASSWORD=verysecret
+export NEO4J_PASSWORD=verysecret
 ```
 
 ### Create the server application in Auth0
