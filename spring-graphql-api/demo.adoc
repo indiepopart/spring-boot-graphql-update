@@ -1,0 +1,37 @@
+:experimental:
+:commandkey: &#8984;
+:toc: macro
+:source-highlighter: highlight.js
+
+= GraphQL API with Spring Boot
+
+In this demo, you'll see how to build a GraphQL API with Spring Boot. You'll use Spring for GraphQL to expose a Reactive Neo4j repository as a RESTful API. You'll build a client application using React.js and Next.js. You'll also use the Okta Spring Boot Starter to add authorization to the server application, with Auth0 as the Identity Provider. Finally, you'll use the Auth0 React SDK for adding authentication to the React client application.
+
+Features:
+
+🖪 Neo4j Database +
+🔐 Security with OAuth 2.0 and OpenID Connect +
+🌟 Refresh Tokens for better security +
+🔧 Okta Spring Boot Starter for the server +
+🔧 Auth0 React SDK for the client +
+🌐 Auth0 as the Identity Provider
+
+
+**Prerequisites**:
+
+
+- https://docs.npmjs.com/downloading-and-installing-node-js-and-npm[Node.js v20.10.0]
+- https://docs.npmjs.com/downloading-and-installing-node-js-and-npm[npm 10.2.3]
+- https://adoptium.net/[Java 17]: I recommend using https://sdkman.io/[SDKMAN!] to manage and install multiple versions of Java.
+- https://docs.docker.com/desktop/[Docker 24.0.7]
+- https://auth0.com/signup[Auth0 account]
+- https://github.com/auth0/auth0-cli#installation[Auth0 CLI 1.3.0] and https://auth0.com/signup[an Auth0 account]
+- https://httpie.io/[HTTPie 3.2.2]
+- https://nextjs.org/[Next.js 14.0.4]
+
+
+toc::[]
+
+**Fast Track**: https://github.com/oktadev/auth0-java-microservices-examples[Clone the repo] and follow the instructions in link:README.md[`spring-graphql-react/README.md`] to configure everything.
+
+== Build a GraphQL API with Spring Boot
