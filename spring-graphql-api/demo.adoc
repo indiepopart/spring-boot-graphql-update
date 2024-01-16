@@ -16,9 +16,7 @@ Features:
 🔧 Auth0 React SDK for the client +
 🌐 Auth0 as the Identity Provider
 
-
 **Prerequisites**:
-
 
 - https://docs.npmjs.com/downloading-and-installing-node-js-and-npm[Node.js v20.10.0]
 - https://docs.npmjs.com/downloading-and-installing-node-js-and-npm[npm 10.2.3]
@@ -35,3 +33,726 @@ toc::[]
 **Fast Track**: https://github.com/oktadev/auth0-java-microservices-examples[Clone the repo] and follow the instructions in link:README.md[`spring-graphql-react/README.md`] to configure everything.
 
 == Build a GraphQL API with Spring Boot
+
+. Create the application with Spring Initializr and HTTPie:
++
+[source,shell]
+----
+https start.spring.io/starter.tgz \
+  bootVersion==3.2.1 \
+  language==java \
+  packaging==jar \
+  javaVersion==17 \
+  type==gradle-project \
+  dependencies==data-neo4j,graphql,docker-compose,web \
+  groupId==com.okta.developer \
+  artifactId==spring-graphql  \
+  name=="Spring Boot API" \
+  description=="Demo project of a Spring Boot GraphQL API" \
+  baseDir==spring-graphql-api \
+  packageName==com.okta.developer.demo \
+  | tar -xzvf -
+----
+
+. Open the `spring-graphql-api` directory in IntelliJ IDEA:
++
+    idea spring-graphql-api
+
+. Define the GraphQL API with a schema file:
++
+[source,graphql]
+.src/main/resources/graphql/schema.graphqls
+----
+type Query {
+    companyList(page: Int): [Company!]!
+    companyCount: Int
+}
+
+type Company {
+    id: ID
+    SIC: String
+    category: String
+    companyNumber: String
+    countryOfOrigin: String
+    incorporationDate: String
+    mortgagesOutstanding: Int
+    name: String
+    status: String
+    controlledBy: [Person!]!
+    owns: [Property!]!
+}
+
+type Person {
+    id: ID
+    birthMonth: String
+    birthYear: String
+    nationality: String
+    name: String
+    countryOfResidence: String
+}
+
+type Property {
+    id: ID
+    address: String
+    county: String
+    district: String
+    titleNumber: String
+}
+----
+
+. Add the classes `Person`, `Property` and `Company`.
++
+[source,java]
+.src/main/java/com/okta/developer/demo/domain/Company.java
+----
+package com.okta.developer.demo.domain;
+
+import org.springframework.data.neo4j.core.schema.GeneratedValue;
+import org.springframework.data.neo4j.core.schema.Id;
+import org.springframework.data.neo4j.core.schema.Node;
+
+@Node
+public class Person {
+
+    @Id @GeneratedValue
+    private Long id;
+
+    private String birthMonth;
+    private String birthYear;
+    private String countryOfResidence;
+
+    private String name;
+    private String nationality;
+
+    public Person(String birthMonth, String birthYear, String countryOfResidence, String name, String nationality) {
+        this.id = null;
+        this.birthMonth = birthMonth;
+        this.birthYear = birthYear;
+        this.countryOfResidence = countryOfResidence;
+        this.name = name;
+        this.nationality = nationality;
+    }
+
+    public Person withId(Long id) {
+        if (this.id.equals(id)) {
+            return this;
+        } else {
+            Person newObject = new Person(this.birthMonth, this.birthYear, this.countryOfResidence, this.name, this.nationality);
+            newObject.id = id;
+            return newObject;
+        }
+    }
+
+    public String getBirthMonth() {
+        return birthMonth;
+    }
+
+    public void setBirthMonth(String birthMonth) {
+        this.birthMonth = birthMonth;
+    }
+
+    public String getBirthYear() {
+        return birthYear;
+    }
+
+    public void setBirthYear(String birthYear) {
+        this.birthYear = birthYear;
+    }
+
+    public String getCountryOfResidence() {
+        return countryOfResidence;
+    }
+
+    public void setCountryOfResidence(String countryOfResidence) {
+        this.countryOfResidence = countryOfResidence;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getNationality() {
+        return nationality;
+    }
+
+    public void setNationality(String nationality) {
+        this.nationality = nationality;
+    }
+
+    public Long getId() {
+        return this.id;
+    }
+}
+----
++
+[source,java]
+.src/main/java/com/okta/developer/demo/domain/Property.java
+----
+package com.okta.developer.demo.domain;
+
+import org.springframework.data.neo4j.core.schema.GeneratedValue;
+import org.springframework.data.neo4j.core.schema.Id;
+import org.springframework.data.neo4j.core.schema.Node;
+
+@Node
+public class Property {
+
+    @Id
+    @GeneratedValue  private Long id;
+    private String address;
+    private String county;
+    private String district;
+    private String titleNumber;
+
+    public Property(String address, String county, String district, String titleNumber) {
+        this.id = null;
+        this.address = address;
+        this.county = county;
+        this.district = district;
+        this.titleNumber = titleNumber;
+    }
+
+    public Property withId(Long id) {
+        if (this.id.equals(id)) {
+            return this;
+        } else {
+            Property newObject = new Property(this.address, this.county, this.district, this.titleNumber);
+            newObject.id = id;
+            return newObject;
+        }
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public String getCounty() {
+        return county;
+    }
+
+    public void setCounty(String county) {
+        this.county = county;
+    }
+
+    public String getDistrict() {
+        return district;
+    }
+
+    public void setDistrict(String district) {
+        this.district = district;
+    }
+
+    public String getTitleNumber() {
+        return titleNumber;
+    }
+
+    public void setTitleNumber(String titleNumber) {
+        this.titleNumber = titleNumber;
+    }
+}
+----
++
+[source,java]
+.src/main/java/com/okta/developer/demo/domain/Company.java
+----
+package com.okta.developer.demo.domain;
+
+import org.springframework.data.neo4j.core.schema.GeneratedValue;
+import org.springframework.data.neo4j.core.schema.Id;
+import org.springframework.data.neo4j.core.schema.Node;
+import org.springframework.data.neo4j.core.schema.Relationship;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+@Node
+public class Company {
+    @Id
+    @GeneratedValue
+    private Long id;
+    private String SIC;
+    private String category;
+    private String companyNumber;
+    private String countryOfOrigin;
+    private LocalDate incorporationDate;
+    private Integer mortgagesOutstanding;
+    private String name;
+    private String status;
+
+    // Mapped automatically
+    private List<Property> owns = new ArrayList<>();
+
+    @Relationship(type = "HAS_CONTROL", direction = Relationship.Direction.INCOMING)
+    private List<Person> controlledBy = new ArrayList<>();
+
+    public Company(String SIC, String category, String companyNumber, String countryOfOrigin, LocalDate incorporationDate, Integer mortgagesOutstanding, String name, String status) {
+        this.id = null;
+        this.SIC = SIC;
+        this.category = category;
+        this.companyNumber = companyNumber;
+        this.countryOfOrigin = countryOfOrigin;
+        this.incorporationDate = incorporationDate;
+        this.mortgagesOutstanding = mortgagesOutstanding;
+        this.name = name;
+        this.status = status;
+    }
+
+    public Company withId(Long id) {
+        if (this.id.equals(id)) {
+            return this;
+        } else {
+            Company newObject = new Company(this.SIC, this.category, this.companyNumber, this.countryOfOrigin, this.incorporationDate, this.mortgagesOutstanding, this.name, this.status);
+            newObject.id = id;
+            return newObject;
+        }
+    }
+
+    public String getSIC() {
+        return SIC;
+    }
+
+    public void setSIC(String SIC) {
+        this.SIC = SIC;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
+    public String getCompanyNumber() {
+        return companyNumber;
+    }
+
+    public void setCompanyNumber(String companyNumber) {
+        this.companyNumber = companyNumber;
+    }
+
+    public String getCountryOfOrigin() {
+        return countryOfOrigin;
+    }
+
+    public void setCountryOfOrigin(String countryOfOrigin) {
+        this.countryOfOrigin = countryOfOrigin;
+    }
+
+    public LocalDate getIncorporationDate() {
+        return incorporationDate;
+    }
+
+    public void setIncorporationDate(LocalDate incorporationDate) {
+        this.incorporationDate = incorporationDate;
+    }
+
+    public Integer getMortgagesOutstanding() {
+        return mortgagesOutstanding;
+    }
+
+    public void setMortgagesOutstanding(Integer mortgagesOutstanding) {
+        this.mortgagesOutstanding = mortgagesOutstanding;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+}
+----
+
+. Add the `CompanyRepository` interface:
++
+[source,java]
+.src/main/java/com/okta/developer/demo/repository/CompanyRepository.java
+----
+package com.okta.developer.demo.repository;
+
+import com.okta.developer.demo.domain.Company;
+import org.springframework.data.neo4j.repository.ReactiveNeo4jRepository;
+
+public interface CompanyRepository extends ReactiveNeo4jRepository<Company, Long> {
+
+}
+----
+
+. Create the configuration class `GraphQLConfig` and `SpringBootApiConfig`:
++
+[source,java]
+.src/main/java/com/okta/developer/demo/GraphQLConfig.java
+----
+package com.okta.developer.demo;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.graphql.GraphQlSourceBuilderCustomizer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration(proxyBeanMethods = false)
+class GraphQLConfig {
+
+    private static Logger logger = LoggerFactory.getLogger("graphql");
+
+    @Bean
+    public GraphQlSourceBuilderCustomizer sourceBuilderCustomizer() {
+        return (builder) ->
+                builder.inspectSchemaMappings(report -> {
+                    logger.debug(report.toString());
+                });
+    }
+}
+----
++
+[source,java]
+.src/main/java/com/okta/developer/demo/SpringBootApiConfig.java
+----
+package com.okta.developer.demo;
+
+import org.neo4j.driver.Driver;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.neo4j.core.ReactiveDatabaseSelectionProvider;
+import org.springframework.data.neo4j.core.transaction.ReactiveNeo4jTransactionManager;
+import org.springframework.data.neo4j.repository.config.ReactiveNeo4jRepositoryConfigurationExtension;
+import org.springframework.transaction.ReactiveTransactionManager;
+
+@Configuration
+public class SpringBootApiConfig {
+
+    @Bean(ReactiveNeo4jRepositoryConfigurationExtension.DEFAULT_TRANSACTION_MANAGER_BEAN_NAME) //Required for neo4j
+    public ReactiveTransactionManager reactiveTransactionManager(
+            Driver driver,
+            ReactiveDatabaseSelectionProvider databaseNameProvider) {
+        return new ReactiveNeo4jTransactionManager(driver, databaseNameProvider);
+    }
+}
+----
+
+. Create the `CompanyController` class with endpoints matching the GraphQL schema:
++
+[source,java]
+.src/main/java/com/okta/developer/demo/controller/CompanyController.java
+----
+package com.okta.developer.demo.controller;
+
+import com.okta.developer.demo.domain.Company;
+import com.okta.developer.demo.repository.CompanyRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.graphql.data.method.annotation.Argument;
+import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.stereotype.Controller;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@Controller
+public class CompanyController {
+
+    @Autowired
+    private CompanyRepository companyRepository;
+
+    @QueryMapping
+    public Flux<Company> companyList(@Argument Long page) {
+        return companyRepository.findAll().skip(page * 10).take(10);
+    }
+
+    @QueryMapping
+    public Mono<Long> companyCount() {
+        return companyRepository.count();
+    }
+}
+----
+
+. Add the `CompanyControllerTest` class and a test query file:
++
+[source,java]
+.src/test/java/com/okta/developer/demo/controller/CompanyControllerTest.java
+----
+package com.okta.developer.demo.controller;
+
+import com.okta.developer.demo.domain.Company;
+import com.okta.developer.demo.repository.CompanyRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.graphql.GraphQlTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.graphql.test.tester.GraphQlTester;
+import reactor.core.publisher.Flux;
+
+import java.time.LocalDate;
+
+import static org.mockito.Mockito.when;
+
+@GraphQlTest(CompanyController.class)
+public class CompanyControllerTests {
+
+    @Autowired
+    private GraphQlTester graphQlTester;
+
+    @MockBean
+    private CompanyRepository companyRepository;
+
+    @Test
+    void shouldGetCompanies() {
+
+        when(this.companyRepository.findAll())
+                .thenReturn(Flux.just(new Company(
+                        "1234",
+                        "private",
+                        "12345678",
+                        "UK",
+                        LocalDate.of(2020, 1, 1),
+                        0,
+                        "Test Company",
+                        "active")));
+
+        this.graphQlTester
+                .documentName("companyList")
+                .variable("page", 0)
+                .execute()
+                .path("companyList")
+                .matchesJson("""
+                    [{
+                        "id": null,
+                        "SIC": "1234",
+                        "name": "Test Company",
+                        "status": "active",
+                        "category": "private",
+                        "companyNumber": "12345678",
+                        "countryOfOrigin": "UK"
+                    }]
+                """);
+    }
+}
+----
++
+[source, graphql]
+.src/test/resources/graphql-test/companyList.graphql
+----
+query companyList($page: Int) {
+    companyList(page: $page) {
+        id
+        SIC
+        name
+        status
+        category
+        companyNumber
+        countryOfOrigin
+    }
+}
+----
+
+. Update the test configuration in `build.gradle` file, so passed tests are logged:
++
+[source,groovy]
+----
+tasks.named('test') {
+    useJUnitPlatform()
+
+    testLogging {
+        // set options for log level LIFECYCLE
+        events "failed", "passed"
+    }
+}
+----
+
+. Run the tests:
++
+[source,shell]
+----
+./gradlew test
+----
+
+== Add Neo4j seed data
+
+. Add Neo4j migrations dependency to `build.gradle` file, for the seed data insertion:
++
+[source,groovy]
+.build.gradle
+----
+dependencies {
+    ...
+    implementation 'eu.michael-simons.neo4j:neo4j-migrations-spring-boot-starter:2.8.2'
+    ...
+}
+----
+
+. Create the directory `src/main/resources/neo4j/migrations` and the following migration files:
++
+[source,cypher]
+.src/main/resources/neo4j/migrations/V001__Constraint.cypher
+----
+CREATE CONSTRAINT FOR (c:Company) REQUIRE c.companyNumber IS UNIQUE;
+CREATE CONSTRAINT FOR (p:Person) REQUIRE (p.birthMonth, p.birthYear, p.name) IS UNIQUE;
+CREATE CONSTRAINT FOR (p:Property) REQUIRE p.titleNumber IS UNIQUE;
+----
++
+[source,cypher]
+.src/main/resources/neo4j/migrations/V002__Company.cypher
+----
+LOAD CSV WITH HEADERS FROM "file:///PSCAmericans.csv" AS row
+MERGE (c:Company {companyNumber: row.company_number})
+RETURN COUNT(*);
+----
++
+[source,cypher]
+.src/main/resources/neo4j/migrations/V003__Person.cypher
+----
+LOAD CSV WITH HEADERS FROM "file:///PSCAmericans.csv" AS row
+MERGE (p:Person {name: row.`data.name`, birthYear: row.`data.date_of_birth.year`, birthMonth: row.`data.date_of_birth.month`})
+  ON CREATE SET p.nationality = row.`data.nationality`,
+  p.countryOfResidence = row.`data.country_of_residence`
+RETURN COUNT(*);
+----
++
+[source,cypher]
+.src/main/resources/neo4j/migrations/V004__PersonCompany.cypher
+----
+LOAD CSV WITH HEADERS FROM "file:///PSCAmericans.csv" AS row
+MATCH (c:Company {companyNumber: row.company_number})
+MATCH (p:Person {name: row.`data.name`, birthYear: row.`data.date_of_birth.year`, birthMonth: row.`data.date_of_birth.month`})
+MERGE (p)-[r:HAS_CONTROL]->(c)
+SET r.nature = split(replace(replace(replace(row.`data.natures_of_control`, "[",""),"]",""),  '"', ""), ",")
+RETURN COUNT(*);
+----
++
+[source,cypher]
+.src/main/resources/neo4j/migrations/V005__CompanyData.cypher
+----
+LOAD CSV WITH HEADERS FROM "file:///CompanyDataAmericans.csv" AS row
+MATCH (c:Company {companyNumber: row.` CompanyNumber`})
+SET c.name = row.CompanyName,
+c.mortgagesOutstanding = toInteger(row.`Mortgages.NumMortOutstanding`),
+c.incorporationDate = Date(Datetime({epochSeconds: apoc.date.parse(row.IncorporationDate,'s','dd/MM/yyyy')})),
+c.SIC = row.`SICCode.SicText_1`,
+c.countryOfOrigin = row.CountryOfOrigin,
+c.status = row.CompanyStatus,
+c.category = row.CompanyCategory;
+----
++
+[source,cypher]
+.src/main/resources/neo4j/migrations/V006__Land.cypher
+----
+LOAD CSV WITH HEADERS FROM "file:///LandOwnershipAmericans.csv" AS row
+MATCH (c:Company {companyNumber: row.`Company Registration No. (1)`})
+MERGE (p:Property {titleNumber: row.`Title Number`})
+SET p.address = row.`Property Address`,
+p.county  = row.County,
+p.price   = toInteger(row.`Price Paid`),
+p.district = row.District
+MERGE (c)-[r:OWNS]->(p)
+WITH row, c,r,p WHERE row.`Date Proprietor Added` IS NOT NULL
+SET r.date = Date(Datetime({epochSeconds: apoc.date.parse(row.`Date Proprietor Added`,'s','dd-MM-yyyy')}));
+CREATE INDEX FOR (c:Company) ON c.incorporationDate;
+----
+
+. Update the `application.properties` file:
+
+[source,properties]
+.src/main/resources/application.properties
+----
+spring.graphql.graphiql.enabled=true
+spring.graphql.schema.introspection.enabled=true
+org.neo4j.migrations.transaction-mode=PER_STATEMENT
+
+
+spring.graphql.cors.allowed-origins=http://localhost:3000
+----
+
+. Create an `.env` file in the server root to store the Neo4j credentials:
++
+[source,shell]
+..env
+----
+export NEO4J_PASSWORD=verysecret
+----
++
+Add the file to `.gitignore`
+
+. Download the seed files to an empty directory, as it will be mounted to the Neo4j container:
++
+- https://guides.neo4j.com/ukcompanies/data/CompanyDataAmericans.csv[CompanyDataAmericans.csv]
+- https://guides.neo4j.com/ukcompanies/data/LandOwnershipAmericans.csv[LandOwnershipAmericans.csv]
+- https://guides.neo4j.com/ukcompanies/data/PSCAmericans.csv[PSCAmericans.csv]
+
+. Edit the file compose.yml and add a service for the Neo4j database.
++
+[source,yaml]
+.compose.yml
+----
+services:
+  neo4j:
+    image: neo4j:5
+    volumes:
+      - <csv-dir>:/var/lib/neo4j/import
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}
+      - NEO4JLABS_PLUGINS=["apoc"]
+    # If you want to expose these ports outside your dev PC,
+    # remove the "127.0.0.1:" prefix
+    ports:
+      - '127.0.0.1:7474:7474'
+      - '127.0.0.1:7687:7687'
+    healthcheck:
+      test: ['CMD', 'wget', 'http://localhost:7474/', '-O', '-']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+----
++
+Replace `<csv-dir>` with the path to the CSV files downloaded before
+
+== Run the GraphQL API server
+
+. Start the server with `gradlew`:
++
+[source,shell]
+----
+./gradlew bootRun
+----
+
+. Test the API with GraphiQL at `http://localhost:8080/graphiql`. In the query box on the left, paste the following query and click the play button:
++
+[source,graphql]
+----
+{
+    companyList(page: 20) {
+        id
+        SIC
+        name
+        status
+        category
+        companyNumber
+        countryOfOrigin
+    }
+}
+----
+
+== Build a React client
+
+== Add resource server security
+
+== Add Auth0 login to the client
+
+== Call the GraphQL API with an access token
