@@ -788,7 +788,7 @@ cd react-graphql && \
 npm run dev
 ----
 +
-Navigate to `http://localhost:3000` and you should see the default Next.js page.
+Navigate to `http://localhost:3000` and you should see the default Next.js page. Then stop the application.
 
 . Create the API client
 +
@@ -1145,7 +1145,7 @@ npm run dev
 
 == Add resource server security
 
-. Open a terminal and run `auth0 login` to configure the Auth0 CLI to get an API key for your tenant. Then, run auth0 apps create to register an OIDC app with the appropriate URLs:
+. Stop the application. Open a terminal and run `auth0 login` to configure the Auth0 CLI to get an API key for your tenant. Then, run auth0 apps create to register an OIDC app with the appropriate URLs:
 +
 [source,shell]
 ----
@@ -1233,7 +1233,7 @@ echo -E '{"query":"{\n    companyList(page: 20) {\n        id\n        SIC\n    
 
 == Add Auth0 login to the client
 
-. Create an Auth0 application for the client:
+. Stop the client. Create an Auth0 application for the client:
 +
 [source,shell]
 ----
