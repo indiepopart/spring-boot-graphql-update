@@ -751,8 +751,799 @@ Replace `<csv-dir>` with the path to the CSV files downloaded before
 
 == Build a React client
 
+. Create the application with `create-next-app` at the parent directory of the server application:
++
+[source,shell]
+----
+npx create-next-app
+----
++
+Answer the questions as follows:
++
+----
+✔ What is your project named? ... react-graphql
+✔ Would you like to use TypeScript? ... Yes
+✔ Would you like to use ESLint? ... Yes
+✔ Would you like to use Tailwind CSS? ... No
+✔ Would you like to use `src/` directory? ... Yes
+✔ Would you like to use App Router? (recommended) ... Yes
+✔ Would you like to customize the default import alias? ... No
+----
++
+Add the required dependencies:
++
+[source,shell]
+----
+cd react-graphql && \
+  npm install @mui/x-data-grid && \
+  npm install @mui/material@5.14.5 @emotion/react @emotion/styled && \
+  npm install react-use-custom-hooks && \
+  npm install axios
+----
+
+. Run the client application:
++
+[source,shell]
+----
+npm run dev
+----
++
+Navigate to `http://localhost:3000` and you should see the default Next.js page.
+
+. Create the API client
++
+[source,tsx]
+.src/services/base.tsx
+----
+import axios from 'axios';
+
+export const backendAPI = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_SERVER_URL
+});
+
+export default backendAPI;
+----
++
+[source,tsx]
+.src/services/companies.tsx
+----
+import { AxiosError } from 'axios';
+import { backendAPI } from './base';
+
+export type CompaniesQuery = {
+  page: number;
+};
+
+export type CompanyDTO = {
+  name: string;
+  SIC: string;
+  id: string;
+  companyNumber: string;
+  category: string;
+};
+
+export const CompanyApi = {
+
+  getCompanyCount: async () => {
+    try {
+      const response = await backendAPI.post("/graphql", {
+        query: `{
+        companyCount
+      }`,
+      });
+      return response.data.data.companyCount as number;
+    } catch (error) {
+      console.log("handle get company count error", error);
+      if (error instanceof AxiosError) {
+        let axiosError = error as AxiosError;
+        if (axiosError.response?.data) {
+          throw new Error(axiosError.response?.data as string);
+        }
+      }
+      throw new Error("Unknown error, please contact the administrator");
+    }
+  },
+
+  getCompanyList: async (params?: CompaniesQuery) => {
+    try {
+      const response = await backendAPI.post("/graphql", {
+        query: `{
+        companyList(page: ${params?.page || 0}) {
+          name,
+          SIC,
+          id,
+          companyNumber,
+          category
+        }}`,
+      });
+      return response.data.data.companyList as CompanyDTO[];
+    } catch (error) {
+      console.log("handle get companies error", error);
+      if (error instanceof AxiosError) {
+        let axiosError = error as AxiosError;
+        if (axiosError.response?.data) {
+          throw new Error(axiosError.response?.data as string);
+        }
+      }
+      throw new Error("Unknown error, please contact the administrator");
+    }
+  },
+
+};
+----
+
+. Add `.env.example` abd `.env.local` files to the client root:
++
+[source,shell]
+..env.example,.env.local
+----
+NEXT_PUBLIC_API_SERVER_URL=http://localhost:8080
+----
+
+. Create a companies home page
++
+Create the `CompanyTable` component:
++
+[source,tsx]
+.src/components/company/CompanyTable.tsx
+----
+import { DataGrid, GridColDef, GridEventListener, GridPaginationModel } from '@mui/x-data-grid';
+
+export interface CompanyData {
+  id: string,
+  name: string,
+  category: string,
+  companyNumber: string,
+  SIC: string
+}
+
+export interface CompanyTableProps {
+  rowCount: number,
+  rows: CompanyData[],
+  columns: GridColDef[],
+  pagination: GridPaginationModel,
+  onRowClick?: GridEventListener<"rowClick">
+  onPageChange?: (pagination: GridPaginationModel) => void,
+
+}
+
+const CompanyTable = (props: CompanyTableProps) => {
+
+  return (
+    <>
+      <DataGrid
+        rowCount={props.rowCount}
+        rows={props.rows}
+        columns={props.columns}
+        pageSizeOptions={[props.pagination.pageSize ]}
+        initialState={{
+          pagination: {
+            paginationModel: { page: props.pagination.page, pageSize: props.pagination.pageSize },
+          },
+        }}
+        density="compact"
+        disableColumnMenu={true}
+        disableRowSelectionOnClick={true}
+        disableColumnFilter={true}
+        disableDensitySelector={true}
+        paginationMode="server"
+        onRowClick={props.onRowClick}
+        onPaginationModelChange={props.onPageChange}
+      />
+    </>
+  );
+};
+
+export default CompanyTable;
+----
++
+Create a loader component:
++
+[source,tsx]
+.src/components/loader/Loader.tsx
+----
+import { Box, CircularProgress, Skeleton } from '@mui/material';
+
+const Loader = () => {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200 }}>
+      <CircularProgress />
+    </Box>
+  );
+}
+
+export default Loader;
+----
++
+Create a container component:
++
+[source,tsx]
+.src/components/company/CompanyTableContainer.tsx
+----
+import { GridColDef, GridPaginationModel } from '@mui/x-data-grid';
+import CompanyTable from './CompanyTable';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { CompanyApi } from '@/services/companies';
+import Loader from '../loader/Loader';
+import { useAsync } from 'react-use-custom-hooks';
+
+interface CompanyTableProperties {
+  page?: number;
+}
+
+const columns: GridColDef[] = [
+  { field: 'id', headerName: 'ID', width: 70 },
+  {
+    field: 'companyNumber',
+    headerName: 'Company #',
+    width: 100,
+    sortable: false,
+  },
+  { field: 'name', headerName: 'Company Name', width: 350, sortable: false },
+  { field: 'category', headerName: 'Category', width: 200, sortable: false },
+  { field: 'SIC', headerName: 'SIC', width: 400, sortable: false },
+];
+
+const CompanyTableContainer = (props: CompanyTableProperties) => {
+  const router = useRouter();
+  const searchParams = useSearchParams()!;
+  const pathName = usePathname();
+  const page = props.page ? props.page : 1;
+
+  const [dataList, loadingList, errorList] = useAsync(
+    () => CompanyApi.getCompanyList({ page: page - 1 }),
+    {},
+    [page]
+  );
+  const [dataCount] = useAsync(() => CompanyApi.getCompanyCount(), {}, []);
+
+  const onPageChange = (pagination: GridPaginationModel) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const page = pagination.page + 1;
+    params.set("page", page.toString());
+    router.push(pathName + "?" + params.toString());
+  };
+
+  return (
+    <>
+      {loadingList && <Loader />}
+      {errorList && <div>Error</div>}
+
+      {!loadingList && dataList && (
+        <CompanyTable
+          pagination={{ page: page - 1, pageSize: 10 }}
+          rowCount={dataCount}
+          rows={dataList}
+          columns={columns}
+          onPageChange={onPageChange}
+        ></CompanyTable>
+      )}
+    </>
+  );
+};
+
+export default CompanyTableContainer;
+----
++
+Add the page:
++
+[source,tsx]
+.src/app/HomePage.tsx
+----
+'use client';
+
+import CompanyTableContainer from '@/components/company/CompanyTableContainer';
+import { Box, Typography } from '@mui/material';
+import { useSearchParams } from 'next/navigation';
+
+const HomePage = () => {
+  const searchParams = useSearchParams();
+  const page = searchParams.get("page")
+    ? parseInt(searchParams.get("page") as string)
+    : 1;
+
+  return (
+    <>
+      <Box>
+        <Typography variant="h4" component="h1">
+          Companies
+        </Typography>
+      </Box>
+      <Box mt={2}>
+        <CompanyTableContainer page={page}></CompanyTableContainer>
+      </Box>
+    </>
+  );
+};
+
+export default HomePage;
+----
++
+Replace the contents of `src/app/page.tsx` with the following:
++
+[source,tsx]
+.src/app/page.tsx
+----
+import HomePage from './HomePage';
+
+const Page = () => {
+  return (
+    <HomePage/>
+  );
+}
+
+export default Page;
+----
++
+Add a layout component:
++
+[source,tsx]
+.src/layout/WideLayout.tsx
+----
+'use client';
+
+import { Container, ThemeProvider, createTheme } from '@mui/material';
+
+const theme = createTheme({
+  typography: {
+    fontFamily: 'inherit',
+  },
+});
+
+const WideLayout = (props: { children: React.ReactNode }) => {
+  return (
+    <ThemeProvider theme={theme}>
+      <Container maxWidth="lg" sx={{ mt: 4 }}>
+        {props.children}
+      </Container>
+    </ThemeProvider>
+  );
+};
+
+export default WideLayout;
+----
++
+Update the root layout:
++
+[source,tsx]
+.src/app/layout.tsx
+----
+import WideLayout from '@/layout/WideLayout';
+import { Ubuntu} from 'next/font/google';
+
+const font = Ubuntu({
+  subsets: ['latin'],
+  weight: ['300','400','500','700'],
+});
+
+export const metadata = {
+  title: "Create Next App",
+  description: "Generated by create next app",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className={font.className}>
+        <WideLayout>{children}</WideLayout>
+      </body>
+    </html>
+  );
+}
+----
++
+Remove `globals.css` and `page.module.css` files.
++
+Run the application with:
++
+[source,shell]
+----
+npm run dev
+----
+
 == Add resource server security
+
+. Open a terminal and run `auth0 login` to configure the Auth0 CLI to get an API key for your tenant. Then, run auth0 apps create to register an OIDC app with the appropriate URLs:
++
+[source,shell]
+----
+auth0 apps create \
+  --name "GraphQL Server" \
+  --description "Spring Boot GraphQL Resource Server" \
+  --type regular \
+  --callbacks http://localhost:8080/login/oauth2/code/okta \
+  --logout-urls http://localhost:8080 \
+  --reveal-secrets
+----
++
+. Add the `okta-spring-boot-starter` dependency:
++
+[source,groovy]
+.build.gradle
+----
+dependencies {
+    ...
+    implementation 'com.okta.spring:okta-spring-boot-starter:3.0.6'
+    ...
+}
+----
++
+. Set the client ID, issuer, and audience for OAuth 2.0 in the `application.properties` file:
++
+[source,properties]
+.src/main/resources/application.properties
+----
+okta.oauth2.issuer=https://<your-auth0-domain>/
+okta.oauth2.client-id=<client-id>
+okta.oauth2.audience=${okta.oauth2.issuer}api/v2/
+----
++
+. Add the client secret to the `.env` file:
++
+[source,shell]
+..env
+----
+export OKTA_OAUTH2_CLIENT_SECRET=<client-secret>
+----
++
+. Add the following factory method to the class `SpringBootApiConfig`, for requiring a bearer token for all requests:
++
+[source,java]
+.src/main/java/com/okta/developer/demo/SpringBootApiConfig.java
+----
+    ...
+    @Bean
+    public SecurityFilterChain configure(HttpSecurity http) throws Exception {
+        http.oauth2ResourceServer(oauth2ResourceServer -> oauth2ResourceServer.jwt(withDefaults()));
+        return http.build();
+    }
+    ...
+----
++
+. Run the API server with:
++
+[source,shell]
+----
+./gradlew bootRun
+----
+
+== Test the GraphQL with an access token
+
+. Get an access token with the Auth0 CLI:
++
+[source,shell]
+----
+auth0 test token -a https://<your-auth0-domain>/api/v2/
+----
+
+. Send a request to the API server:
++
+[source,shell]
+----
+ACCESS_TOKEN=<auth0-access-token>
+----
++
+[source,shell]
+----
+echo -E '{"query":"{\n    companyList(page: 20) {\n        id\n        SIC\n        name\n        status\n        category\n        companyNumber\n        countryOfOrigin\n    }\n}"}' | \
+  http -A bearer -a $ACCESS_TOKEN POST http://localhost:8080/graphql
+----
 
 == Add Auth0 login to the client
 
+. Create an Auth0 application for the client:
++
+[source,shell]
+----
+auth0 apps create \
+  --name "React client for GraphQL" \
+  --description "SPA React client for a Spring GraphQL API" \
+  --type spa \
+  --callbacks http://localhost:3000/callback \
+  --logout-urls http://localhost:3000 \
+  --origins http://localhost:3000 \
+  --web-origins http://localhost:3000
+----
++
+. Update `.env.local` with the client ID and domain:
++
+[source,shell]
+..env.local
+----
+NEXT_PUBLIC_AUTH0_DOMAIN=<your-auth0-domain>
+NEXT_PUBLIC_AUTH0_CLIENT_ID=<client-id>
+NEXT_PUBLIC_AUTH0_CALLBACK_URL=http://localhost:3000/callback
+NEXT_PUBLIC_AUTH0_AUDIENCE=https://<your-auth0-domain>/api/v2/
+----
+
+. Add `page.tsx` as login callback:
++
+[source,tsx]
+.src/app/callback/page.tsx
+----
+import Loader from '@/components/loader/Loader';
+
+const Page = () => {
+  return <Loader/>
+};
+
+export default Page;
+----
+
+. Add the Auth0 React SDK dependency:
++
+[source,shell]
+----
+npm install @auth0/auth0-react
+----
+
+. Create the `Auth0ProviderWithNavigate` component
++
+[source,tsx]
+.src/components/authentication/Auth0ProviderWithNavigate.tsx
+----
+import { AppState, Auth0Provider } from '@auth0/auth0-react';
+import { useRouter } from 'next/navigation';
+import React from 'react';
+
+const Auth0ProviderWithNavigate = (props: { children: React.ReactNode }) => {
+  const router = useRouter();
+
+  const domain = process.env.NEXT_PUBLIC_AUTH0_DOMAIN || "";
+  const clientId = process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || "";
+  const redirectUri = process.env.NEXT_PUBLIC_AUTH0_CALLBACK_URL || "";
+  const audience = process.env.NEXT_PUBLIC_AUTH0_AUDIENCE || "";
+
+  const onRedirectCallback = (appState?: AppState) => {
+    router.push(appState?.returnTo || window.location.pathname);
+  };
+
+  if (!(domain && clientId && redirectUri)) {
+    return null;
+  }
+
+  return (
+    <Auth0Provider
+      domain={domain}
+      clientId={clientId}
+      authorizationParams={{
+        audience: audience,
+        redirect_uri: redirectUri,
+      }}
+      useRefreshTokens={true}
+      onRedirectCallback={onRedirectCallback}
+    >
+      <>{props.children}</>
+    </Auth0Provider>
+  );
+};
+
+export default Auth0ProviderWithNavigate;
+----
+
+. Modify the component `WideLayout`:
++
+[source,tsx]
+.src/layout/WideLayout.tsx
+----
+'use client';
+
+import Auth0ProviderWithNavigate from '@/components/authentication/Auth0ProviderWithNavigate';
+import { Container, ThemeProvider, createTheme } from '@mui/material';
+
+const theme = createTheme({
+  typography: {
+    fontFamily: 'inherit',
+  },
+});
+
+const WideLayout = (props: { children: React.ReactNode }) => {
+  return (
+    <ThemeProvider theme={theme}>
+      <Auth0ProviderWithNavigate>
+        <Container maxWidth="lg" sx={{ mt: 4 }}>
+          {props.children}
+        </Container>
+      </Auth0ProviderWithNavigate>
+    </ThemeProvider>
+  );
+};
+
+export default WideLayout;
+----
+
+. Create the component `AuthenticationGuard`:
++
+[source,tsx]
+.src/components/authentication/AuthenticationGuard.tsx
+----
+'use client'
+
+import { useAuth0 } from '@auth0/auth0-react';
+import { useEffect } from 'react';
+import Loader from '../loader/Loader';
+
+const AuthenticationGuard = (props: { children: React.ReactNode }) => {
+  const { isLoading, isAuthenticated, error, loginWithRedirect } = useAuth0();
+
+  useEffect(() => {
+    if (!isAuthenticated && !isLoading) {
+      loginWithRedirect({
+        appState: { returnTo: window.location.href },
+      });
+    }
+  }, [isAuthenticated, isLoading, loginWithRedirect]);
+
+  if (isLoading) {
+    return <Loader />;
+  }
+  if (error) {
+    return <div>Oops... {error.message}</div>;
+  }
+  return <>{isAuthenticated && props.children}</>;
+};
+
+export default AuthenticationGuard;
+----
+
+. Modify the index page:
++
+[source,tsx]
+.src/app/page.tsx
+----
+import AuthenticationGuard from '@/components/authentication/AuthenticationGuard';
+import HomePage from './HomePage';
+
+const Page = () => {
+  return (
+    <AuthenticationGuard>
+      <HomePage/>
+    </AuthenticationGuard>
+  );
+};
+
+export default Page;
+----
+
 == Call the GraphQL API with an access token
+
+. Add request interceptors to the `backendAPI`
++
+[source,tsx]
+.src/services/auth.tsx
+----
+import backendAPI from './base';
+
+let requestInterceptor: number;
+let responseInterceptor: number;
+
+export const clearInterceptors = () => {
+  backendAPI.interceptors.request.eject(requestInterceptor);
+  backendAPI.interceptors.response.eject(responseInterceptor);
+};
+
+export const setInterceptors = (accessToken: String) => {
+
+  clearInterceptors();
+
+  requestInterceptor = backendAPI.interceptors.request.use(
+    // @ts-expect-error
+    function (config) {
+      return {
+        ...config,
+        headers: {
+          ...config.headers,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      };
+    },
+    function (error) {
+      console.log("request interceptor error", error);
+      return Promise.reject(error);
+    }
+  );
+};
+----
+
+. Create the `useAccessToken` hook:
++
+[source,tsx]
+.src/hooks/useAccessToken.tsx
+----
+import { setInterceptors } from '@/services/auth';
+import { useAuth0 } from '@auth0/auth0-react';
+import { useCallback, useState } from 'react';
+
+export const useAccessToken = () => {
+  const { isAuthenticated, getAccessTokenSilently } = useAuth0();
+  const [accessToken, setAccessToken] = useState("");
+
+  const saveAccessToken = useCallback(async () => {
+    if (isAuthenticated) {
+      try {
+        const tokenValue = await getAccessTokenSilently();
+        if (accessToken !== tokenValue) {
+          setInterceptors(tokenValue);
+          setAccessToken(tokenValue);
+        }
+      } catch (err) {
+        // Inactivity timeout
+        console.log("getAccessTokenSilently error", err);
+      }
+    }
+  }, [getAccessTokenSilently, isAuthenticated, accessToken]);
+
+  return {
+    saveAccessToken,
+  };
+};
+----
+
+. Create the `useAsyncWithToken` hook:
++
+[source,tsx]
+.src/hooks/useAsyncWithToken.tsx
+----
+import { useAccessToken } from './useAccessToken';
+import { useAsync } from 'react-use-custom-hooks';
+
+export const useAsyncWithToken = <T, P, E = string>(
+  asyncOperation: () => Promise<T>, deps: any[]
+) => {
+  const { saveAccessToken } = useAccessToken();
+  const [ data, loading, error ] = useAsync(async () => {
+    await saveAccessToken();
+    return asyncOperation();
+  }, {},  deps);
+
+  return {
+    data,
+    loading,
+    error
+  };
+};
+----
+
+. Update the calls in `CompanyTableContainer`:
++
+[source,diff]
+.src/components/company/CompanyTableContainer.tsx
+----
+- import { useAsync } from 'react-use-custom-hooks';
++ import { useAsyncWithToken } from '@/hooks/useAsyncWithToken';
+
+...
+- const [dataList, loadingList, errorList] = useAsync(
+-   () => CompanyApi.getCompanyList({ page: page - 1 }),
+-   {},
+-   [page]
+-  );
+- const [dataCount] = useAsync(() => CompanyApi.getCompanyCount(), {}, []);
++ const {
++   data: dataList,
++   loading: loadingList,
++   error: errorList,
++ } = useAsyncWithToken(
++   () => CompanyApi.getCompanyList({ page: page - 1}),
++   [props.page]
++ );
++
++ const { data: dataCount } = useAsyncWithToken(
++   () => CompanyApi.getCompanyCount(),
++   []
++ );
+...
+----
+
+. Run the application with:
++
+[source,shell]
+----
+npm run dev
+----
+
+. Test the application at `http://localhost:3000`
