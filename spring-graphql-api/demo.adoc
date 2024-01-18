@@ -56,7 +56,10 @@ https start.spring.io/starter.tgz \
 
 . Open the `spring-graphql-api` directory in IntelliJ IDEA:
 +
-    idea spring-graphql-api
+[source,shell]
+----
+idea spring-graphql-api
+----
 
 . Define the GraphQL API with a schema file:
 +
@@ -103,7 +106,7 @@ type Property {
 . Add the classes `Person`, `Property` and `Company`.
 +
 [source,java]
-.src/main/java/com/okta/developer/demo/domain/Company.java
+.src/main/java/com/okta/developer/demo/domain/Person.java
 ----
 package com.okta.developer.demo.domain;
 
@@ -591,11 +594,7 @@ tasks.named('test') {
 [source,groovy]
 .build.gradle
 ----
-dependencies {
-    ...
-    implementation 'eu.michael-simons.neo4j:neo4j-migrations-spring-boot-starter:2.8.2'
-    ...
-}
+implementation 'eu.michael-simons.neo4j:neo4j-migrations-spring-boot-starter:2.8.2'
 ----
 
 . Create the directory `src/main/resources/neo4j/migrations` and the following migration files:
@@ -1142,6 +1141,8 @@ export default function RootLayout({
 ----
 npm run dev
 ----
++
+You will see a table of companies
 
 == Add resource server security
 
@@ -1163,11 +1164,7 @@ auth0 apps create \
 [source,groovy]
 .build.gradle
 ----
-dependencies {
-    ...
-    implementation 'com.okta.spring:okta-spring-boot-starter:3.0.6'
-    ...
-}
+implementation 'com.okta.spring:okta-spring-boot-starter:3.0.6'
 ----
 +
 . Set the client ID, issuer, and audience for OAuth 2.0 in the `application.properties` file:
@@ -1193,13 +1190,11 @@ export OKTA_OAUTH2_CLIENT_SECRET=<client-secret>
 [source,java]
 .src/main/java/com/okta/developer/demo/SpringBootApiConfig.java
 ----
-    ...
     @Bean
     public SecurityFilterChain configure(HttpSecurity http) throws Exception {
         http.oauth2ResourceServer(oauth2ResourceServer -> oauth2ResourceServer.jwt(withDefaults()));
         return http.build();
     }
-    ...
 ----
 +
 . Run the API server with:
@@ -1209,7 +1204,7 @@ export OKTA_OAUTH2_CLIENT_SECRET=<client-secret>
 ./gradlew bootRun
 ----
 
-== Test the GraphQL with an access token
+== Test the GraphQL API with an access token
 
 . Get an access token with the Auth0 CLI:
 +
@@ -1255,7 +1250,7 @@ auth0 apps create \
 NEXT_PUBLIC_AUTH0_DOMAIN=<your-auth0-domain>
 NEXT_PUBLIC_AUTH0_CLIENT_ID=<client-id>
 NEXT_PUBLIC_AUTH0_CALLBACK_URL=http://localhost:3000/callback
-NEXT_PUBLIC_AUTH0_AUDIENCE=https://<your-auth0-domain>/api/v2/
+NEXT_PUBLIC_AUTH0_AUDIENCE=https://$NEXT_PUBLIC_AUTH0_DOMAIN/api/v2/
 ----
 
 . Add `page.tsx` as login callback:
@@ -1291,10 +1286,10 @@ import React from 'react';
 const Auth0ProviderWithNavigate = (props: { children: React.ReactNode }) => {
   const router = useRouter();
 
-  const domain = process.env.NEXT_PUBLIC_AUTH0_DOMAIN || "";
-  const clientId = process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || "";
-  const redirectUri = process.env.NEXT_PUBLIC_AUTH0_CALLBACK_URL || "";
-  const audience = process.env.NEXT_PUBLIC_AUTH0_AUDIENCE || "";
+  const domain = process.env.NEXT_PUBLIC_AUTH0_DOMAIN ||'';
+  const clientId = process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID || '';
+  const redirectUri = process.env.NEXT_PUBLIC_AUTH0_CALLBACK_URL || '';
+  const audience = process.env.NEXT_PUBLIC_AUTH0_AUDIENCE || '';
 
   const onRedirectCallback = (appState?: AppState) => {
     router.push(appState?.returnTo || window.location.pathname);
@@ -1506,35 +1501,51 @@ export const useAsyncWithToken = <T, P, E = string>(
 };
 ----
 
-. Update the calls in `CompanyTableContainer`:
+. Update the calls in `.src/components/company/CompanyTableContainer.tsx`:
++
+Remove the import:
 +
 [source,diff]
-.src/components/company/CompanyTableContainer.tsx
 ----
-- import { useAsync } from 'react-use-custom-hooks';
-+ import { useAsyncWithToken } from '@/hooks/useAsyncWithToken';
-
-...
-- const [dataList, loadingList, errorList] = useAsync(
--   () => CompanyApi.getCompanyList({ page: page - 1 }),
--   {},
--   [page]
--  );
-- const [dataCount] = useAsync(() => CompanyApi.getCompanyCount(), {}, []);
-+ const {
-+   data: dataList,
-+   loading: loadingList,
-+   error: errorList,
-+ } = useAsyncWithToken(
-+   () => CompanyApi.getCompanyList({ page: page - 1}),
-+   [props.page]
-+ );
+import { useAsync } from 'react-use-custom-hooks';
+----
 +
-+ const { data: dataCount } = useAsyncWithToken(
-+   () => CompanyApi.getCompanyCount(),
-+   []
-+ );
-...
+Add the import:
++
+[source,diff]
+----
+import { useAsyncWithToken } from '@/hooks/useAsyncWithToken';
+----
++
+Remove the lines:
++
+[source,diff]
+----
+const [dataList, loadingList, errorList] = useAsync(
+ () => CompanyApi.getCompanyList({ page: page - 1 }),
+ {},
+ [page]
+);
+const [dataCount] = useAsync(() => CompanyApi.getCompanyCount(), {}, []);
+----
++
+Add the lines:
++
+[source,diff]
+----
+const {
+ data: dataList,
+ loading: loadingList,
+ error: errorList,
+} = useAsyncWithToken(
+ () => CompanyApi.getCompanyList({ page: page - 1}),
+ [props.page]
+);
+
+const { data: dataCount } = useAsyncWithToken(
+ () => CompanyApi.getCompanyCount(),
+ []
+);
 ----
 
 . Run the application with:
@@ -1544,4 +1555,4 @@ export const useAsyncWithToken = <T, P, E = string>(
 npm run dev
 ----
 
-. Test the application at `http://localhost:3000`
+. Test the application at `http://localhost:3000` with a private navigation window
