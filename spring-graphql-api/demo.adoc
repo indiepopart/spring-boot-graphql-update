@@ -668,7 +668,7 @@ CREATE INDEX FOR (c:Company) ON c.incorporationDate;
 ----
 
 . Update the `application.properties` file:
-
++
 [source,properties]
 .src/main/resources/application.properties
 ----
@@ -769,8 +769,8 @@ Answer the questions as follows:
 ✔ Would you like to use App Router? (recommended) ... Yes
 ✔ Would you like to customize the default import alias? ... No
 ----
-+
-Add the required dependencies:
+
+. Add the required dependencies:
 +
 [source,shell]
 ----
@@ -880,9 +880,7 @@ export const CompanyApi = {
 NEXT_PUBLIC_API_SERVER_URL=http://localhost:8080
 ----
 
-. Create a companies home page
-+
-Create the `CompanyTable` component:
+. Create the `CompanyTable` component:
 +
 [source,tsx]
 .src/components/company/CompanyTable.tsx
@@ -936,8 +934,8 @@ const CompanyTable = (props: CompanyTableProps) => {
 
 export default CompanyTable;
 ----
-+
-Create a loader component:
+
+. Create a loader component:
 +
 [source,tsx]
 .src/components/loader/Loader.tsx
@@ -954,8 +952,8 @@ const Loader = () => {
 
 export default Loader;
 ----
-+
-Create a container component:
+
+. Create a container component:
 +
 [source,tsx]
 .src/components/company/CompanyTableContainer.tsx
@@ -1024,8 +1022,8 @@ const CompanyTableContainer = (props: CompanyTableProperties) => {
 
 export default CompanyTableContainer;
 ----
-+
-Add the page:
+
+. Add the `HomePage` component:
 +
 [source,tsx]
 .src/app/HomePage.tsx
@@ -1058,8 +1056,8 @@ const HomePage = () => {
 
 export default HomePage;
 ----
-+
-Replace the contents of `src/app/page.tsx` with the following:
+
+. Replace the contents of `src/app/page.tsx` with the following:
 +
 [source,tsx]
 .src/app/page.tsx
@@ -1074,8 +1072,8 @@ const Page = () => {
 
 export default Page;
 ----
-+
-Add a layout component:
+
+. Add a layout component:
 +
 [source,tsx]
 .src/layout/WideLayout.tsx
@@ -1102,8 +1100,8 @@ const WideLayout = (props: { children: React.ReactNode }) => {
 
 export default WideLayout;
 ----
-+
-Update the root layout:
+
+. Update the root layout:
 +
 [source,tsx]
 .src/app/layout.tsx
@@ -1135,10 +1133,10 @@ export default function RootLayout({
   );
 }
 ----
-+
-Remove `globals.css` and `page.module.css` files.
-+
-Run the application with:
+
+. Remove `globals.css` and `page.module.css` files.
+
+. Run the application with:
 +
 [source,shell]
 ----
